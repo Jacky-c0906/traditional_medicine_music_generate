@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <title>Suno 音乐生成</title>
+    <style>
+        body { font-family: sans-serif; margin: 40px auto; max-width: 600px; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; }
+        pre { background: #f4f4f4; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🎵 Suno 音乐生成</h1>
+    <p>输入提示词，生成属于你的音乐！</p>
+    <input type="text" id="prompt" placeholder="例如：Lofi chill piano, warm tape texture" value="Lofi chill piano, warm tape texture"/>
+    <select id="model">
+        <option value="chirp-v4-5">chirp-v4-5</option>
+        <option value="chirp-v3-5">chirp-v3-5</option>
+    </select>
+    <input type="number" id="duration" placeholder="时长（秒）" value="60" min="1" max="300"/>
+    <label><input type="checkbox" id="instrumental" checked /> 纯音乐</label>
+    <button onclick="generate()">生成音乐</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function generate() {
+            const prompt = document.getElementById("prompt").value;
+            const model = document.getElementById("model").value;
+            const duration = document.getElementById("duration").value;
+            const instrumental = document.getElementById("instrumental").checked;
+            const res = await fetch("https://suno-submit-htkcgbflzs.cn-shenzhen.fcapp.run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt, model, duration, instrumental })
+            });
+            const text = await res.text();
+            document.getElementById("result").textContent = text;
+        }
+    </script>
+</body>
+</html>
