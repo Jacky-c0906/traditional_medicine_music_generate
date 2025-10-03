@@ -1,41 +1,62 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-    <meta charset="UTF-8" />
-    <title>Suno 音乐生成</title>
-    <style>
-        body { font-family: sans-serif; margin: 40px auto; max-width: 600px; }
-        input, button { padding: 10px; margin: 5px 0; width: 100%; }
-        pre { background: #f4f4f4; padding: 10px; overflow: auto; }
-    </style>
-</head>
-<body>
-    <h1>🎵 Suno 音乐生成</h1>
-    <p>输入提示词，生成属于你的音乐！</p>
-    <input type="text" id="prompt" placeholder="例如：Lofi chill piano, warm tape texture" value="Lofi chill piano, warm tape texture"/>
-    <select id="model">
-        <option value="chirp-v4-5">chirp-v4-5</option>
-        <option value="chirp-v3-5">chirp-v3-5</option>
-    </select>
-    <input type="number" id="duration" placeholder="时长（秒）" value="60" min="1" max="300"/>
-    <label><input type="checkbox" id="instrumental" checked /> 纯音乐</label>
-    <button onclick="generate()">生成音乐</button>
-    <pre id="result"></pre>
+<script>
+  // 单一入口地址：你的 FC 触发器根路径（不要写 /submit 或 /query）
+  const API_URL = "https://suno-submit-htkcgbflzs.cn-shenzhen.fcapp.run";
 
-    <script>
-        async function generate() {
-            const prompt = document.getElementById("prompt").value;
-            const model = document.getElementById("model").value;
-            const duration = document.getElementById("duration").value;
-            const instrumental = document.getElementById("instrumental").checked;
-            const res = await fetch("https://suno-submit-htkcgbflzs.cn-shenzhen.fcapp.run", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, model, duration, instrumental })
-            });
-            const text = await res.text();
-            document.getElementById("result").textContent = text;
+  const $ = (id)=>document.getElementById(id);
+  const log = (v)=>{ $("log").textContent = typeof v==="string" ? v : JSON.stringify(v,null,2); };
+
+  async function apiCall(payload){
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload || {})
+    });
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return { raw: text }; }
+  }
+
+  async function poll(taskId){
+    for(let i=0;i<40;i++){
+      await new Promise(r=>setTimeout(r, 4000));
+      const data = await apiCall({ task_id: taskId }); // 查询同样 POST 到同一路径
+      log(data);
+      if(data && (data.status === "succeeded" || data.status === "failed")){
+        if(data.status === "succeeded" && Array.isArray(data.data)){
+          const box = $("result"); box.innerHTML = "";
+          data.data.forEach((it, idx)=>{
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+              <div><strong>Track ${idx+1}</strong></div>
+              ${it.image_url ? `<img alt="cover" style="max-width:100%;border-radius:8px;margin:8px 0" src="${it.image_url}">` : ""}
+              ${it.audio_url ? `<audio controls src="${it.audio_url}"></audio>` : "<div>暂无音频链接</div>"}
+            `;
+            box.appendChild(card);
+          });
         }
-    </script>
-</body>
-</html>
+        break;
+      }
+    }
+  }
+
+  $("btn").addEventListener("click", async ()=>{
+    const btn = $("btn"); btn.disabled = true;
+    const prompt = $("prompt").value.trim();
+    const duration = parseInt($("duration").value || "60", 10);
+    const instrumental = $("instrumental").value === "true";
+    const model = (document.getElementById("model")?.value) || "chirp-v4-5"; // 若有模型选择器
+
+    log("Submitting...");
+    try{
+      const res = await apiCall({ prompt, duration, instrumental, model });
+      log(res);
+      const taskId = res.task_id || res.id || null;
+      if(taskId){ await poll(taskId); }
+      else { log("已提交。若未返回 task_id，请检查后端创建任务返回体。"); }
+    }catch(e){
+      log(`请求失败：${e}`);
+    }finally{
+      btn.disabled = false;
+    }
+  });
+</script>
